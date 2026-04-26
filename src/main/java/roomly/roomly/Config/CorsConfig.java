@@ -17,6 +17,12 @@ public class CorsConfig {
                         .allowedHeaders("*")
                         .allowCredentials(true);
             }
+
+            @Override
+            public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+                // Registramos el TenantInterceptor para extraer tenant del primer segmento de la ruta
+                registry.addInterceptor(new roomly.roomly.Security.TenantInterceptor()).addPathPatterns("/**");
+            }
         };
     }
 
