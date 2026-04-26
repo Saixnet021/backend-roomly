@@ -23,6 +23,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -87,7 +88,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration c = new CorsConfiguration();
-        c.setAllowedOrigins(List.of("http://localhost:4200")); // origen permitido
+        // Leer orígenes permitidos desde la variable de entorno FRONTEND_ORIGINS (coma-separada).
+        // Si no existe, usar localhost:4200 y patrones para Vercel (subdominios) por defecto.
+        String originsEnv = System.getenv("FRONTEND_ORIGINS");
+        List<String> allowedPatterns;
+        if (originsEnv != null && !originsEnv.isBlank()) {
+            String[] arr = originsEnv.split(",");
+            for (int i = 0; i < arr.length; i++) arr[i] = arr[i].trim();
+            allowedPatterns = Arrays.asList(arr);
+        } else {
+            allowedPatterns = List.of("http://localhost:4200", "https://frontend-roomly.vercel.app", "https://*.vercel.app");
+        }
+        // Usar origin patterns para permitir subdominios en hosts manejados (Vercel, etc.)
+        c.setAllowedOriginPatterns(allowedPatterns);
+        System.out.println("CORS allowed origin patterns: " + allowedPatterns);
         c.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS")); // métodos permitidos
         c.setAllowedHeaders(List.of("*")); // todos los headers permitidos
         c.setAllowCredentials(true); // permitir credenciales (cookies) si se usa

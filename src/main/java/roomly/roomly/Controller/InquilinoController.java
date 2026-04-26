@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/inquilinos")
-@CrossOrigin(origins = "http://localhost:4200")
 public class InquilinoController {
 
     @Autowired
