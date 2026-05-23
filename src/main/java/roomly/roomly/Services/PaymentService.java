@@ -98,13 +98,22 @@ public class PaymentService {
 
     /**
      * Obtener todos los pagos de un inquilino
+     * SECURITY: Valida que el inquilino pertenezca al tenant específico
      */
-    public List<PaymentDTO> getPaymentsByInquilino(Long inquilinoId) {
+    public List<PaymentDTO> getPaymentsByInquilino(Long inquilinoId, Tenant tenant) {
         Optional<Inquilino> opt = inquilinoRepository.findById(inquilinoId);
         if (!opt.isPresent()) {
             return List.of();
         }
-        List<Payment> payments = paymentRepository.findByInquilinoOrderByDueDateDesc(opt.get());
+        
+        Inquilino inquilino = opt.get();
+        
+        // Validar que el inquilino pertenece al tenant solicitante
+        if (inquilino.getTenant() == null || !inquilino.getTenant().getId().equals(tenant.getId())) {
+            throw new RuntimeException("Acceso denegado: El inquilino no pertenece a este tenant");
+        }
+        
+        List<Payment> payments = paymentRepository.findByInquilinoOrderByDueDateDesc(inquilino);
         return payments.stream().map(this::entityToDTO).collect(Collectors.toList());
     }
 

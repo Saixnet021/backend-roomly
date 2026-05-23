@@ -74,6 +74,7 @@ public class PaymentController {
 
     /**
      * GET /api/payments/inquilino/{inquilinoId} - Obtener pagos de un inquilino específico
+     * SECURITY: Valida que el inquilino pertenezca al tenant autenticado
      */
     @GetMapping("/inquilino/{inquilinoId}")
     public ResponseEntity<List<PaymentDTO>> getPaymentsByInquilino(@PathVariable Long inquilinoId) {
@@ -81,7 +82,7 @@ public class PaymentController {
         if (tenant == null) {
             return ResponseEntity.status(403).build();
         }
-        List<PaymentDTO> payments = paymentService.getPaymentsByInquilino(inquilinoId);
+        List<PaymentDTO> payments = paymentService.getPaymentsByInquilino(inquilinoId, tenant);
         return ResponseEntity.ok(payments);
     }
 
