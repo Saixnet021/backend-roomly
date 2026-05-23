@@ -179,6 +179,7 @@ public class InquilinoController {
             return ResponseEntity.status(404).build();
         }
 
+        String oldEmail = i.getEmail();
         i.setName(dto.getName());
         i.setDocument(dto.getDocument());
         i.setEmail(dto.getEmail());
@@ -202,7 +203,6 @@ public class InquilinoController {
                 roomRepository.save(r);
             }
         } else {
-            // Liberar cuarto anterior (opcional para un MVP avanzado, acá solo lo desasignamos)
             if (i.getRoom() != null) {
                 Room r = i.getRoom();
                 r.setStatus("Disponible");
@@ -212,6 +212,19 @@ public class InquilinoController {
         }
 
         Inquilino saved = inquilinoRepository.save(i);
+        
+        // Actualizar Usuario correspondiente si existe
+        if (oldEmail != null) {
+            usuarioRepository.findFirstByEmailIgnoreCase(oldEmail).ifPresent(u -> {
+                u.setEmail(dto.getEmail());
+                u.setFirstName(dto.getName());
+                if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+                    u.setPassword(passwordEncoder.encode(dto.getPassword()));
+                }
+                usuarioRepository.save(u);
+            });
+        }
+
         if (saved.getProperty() != null) dto.setPropertyName(saved.getProperty().getName());
         dto.setId(saved.getId());
 
@@ -228,7 +241,44 @@ public class InquilinoController {
             return ResponseEntity.status(404).build();
         }
 
+        // Liberar el cuarto si tiene uno asignado
+        if (i.getRoom() != null) {
+            Room r = i.getRoom();
+            r.setStatus("Disponible");
+            roomRepository.save(r);
+        }
+
+        // Eliminar Usuario correspondiente si existe
+        if (i.getEmail() != null) {
+            usuarioRepository.findFirstByEmailIgnoreCase(i.getEmail()).ifPresent(u -> {
+                usuarioRepository.delete(u);
+            });
+        }
+
         inquilinoRepository.delete(i);
         return ResponseEntity.ok(java.util.Map.of("message", "Inquilino eliminado con éxito"));
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody java.util.Map<String, String> body) {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof org.springframework.security.core.userdetails.UserDetails ud)) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        String email = ud.getUsername();
+        String newPassword = body.get("password");
+        if (newPassword == null || newPassword.isBlank() || newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("message", "La contraseña debe tener al menos 6 caracteres"));
+        }
+        
+        Optional<Usuario> userOpt = usuarioRepository.findFirstByEmailIgnoreCase(email);
+        if (userOpt.isPresent()) {
+            Usuario u = userOpt.get();
+            u.setPassword(passwordEncoder.encode(newPassword));
+            usuarioRepository.save(u);
+            return ResponseEntity.ok(java.util.Map.of("message", "Contraseña actualizada con éxito"));
+        }
+        return ResponseEntity.status(404).build();
     }
 }

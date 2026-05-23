@@ -111,15 +111,19 @@ public class Payment extends AbstractTenantEntity {
      */
     public void calculateDelayPenalty(Double dailyPenaltyRate) {
         if ("PAGADO".equals(status)) {
-            delayPenalty = 0.0;
             return;
         }
 
         LocalDate today = LocalDate.now();
         if (today.isAfter(dueDate)) {
             long daysLate = java.time.temporal.ChronoUnit.DAYS.between(dueDate, today);
-            Double pending = amount - amountPaid;
-            delayPenalty = pending * dailyPenaltyRate * daysLate;
+            if (daysLate > 5) {
+                delayPenalty = (daysLate - 5) * 5.0;
+            } else {
+                delayPenalty = 0.0;
+            }
+        } else {
+            delayPenalty = 0.0;
         }
     }
 

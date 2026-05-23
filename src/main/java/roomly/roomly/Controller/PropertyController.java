@@ -45,6 +45,40 @@ public class PropertyController {
         return null;
     }
 
+    private PropertyDTO entityToDTO(Property p, Tenant tenant) {
+        PropertyDTO dto = new PropertyDTO();
+        dto.setId(p.getId());
+        dto.setName(p.getName());
+        dto.setAddress(p.getAddress());
+        dto.setPrice(p.getPrice());
+
+        // Datos reales de cuartos
+        List<Room> rooms = roomRepository.findByProperty(p);
+        long total = rooms.size();
+        long occupied = rooms.stream().filter(r -> "Ocupado".equals(r.getStatus())).count();
+        dto.setRoomCount(total);
+        dto.setOccupiedRooms(occupied);
+        
+        // Cálculo de ingresos
+        double income = rooms.stream()
+            .filter(r -> "Ocupado".equals(r.getStatus()) && r.getPrice() != null)
+            .mapToDouble(Room::getPrice).sum();
+            
+        // + Ingreso por departamento completo si aplica
+        boolean isFullRented = false;
+        if (tenant != null) {
+            isFullRented = inquilinoRepository.findByTenant(tenant).stream()
+                .anyMatch(i -> i.getProperty() != null && i.getProperty().getId().equals(p.getId()) && i.getRoom() == null);
+        }
+        
+        if (isFullRented && p.getPrice() != null) {
+            income += p.getPrice();
+        }
+
+        dto.setTotalIncome(income);
+        return dto;
+    }
+
     @GetMapping
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<PropertyDTO>> getAllProperties() {
@@ -56,37 +90,9 @@ public class PropertyController {
         }
 
         List<Property> properties = propertyRepository.findByTenant(tenant);
-        
-        List<PropertyDTO> dtos = properties.stream().map(p -> {
-            PropertyDTO dto = new PropertyDTO();
-            dto.setId(p.getId());
-            dto.setName(p.getName());
-            dto.setAddress(p.getAddress());
-            dto.setPrice(p.getPrice());
-
-            // Datos reales de cuartos
-            List<Room> rooms = roomRepository.findByProperty(p);
-            long total = rooms.size();
-            long occupied = rooms.stream().filter(r -> "Ocupado".equals(r.getStatus())).count();
-            dto.setRoomCount(total);
-            dto.setOccupiedRooms(occupied);
-            
-            // Cálculo de ingresos
-            double income = rooms.stream()
-                .filter(r -> "Ocupado".equals(r.getStatus()) && r.getPrice() != null)
-                .mapToDouble(Room::getPrice).sum();
-                
-            // + Ingreso por departamento completo si aplica
-            boolean isFullRented = inquilinoRepository.findByTenant(tenant).stream()
-                .anyMatch(i -> i.getProperty() != null && i.getProperty().getId().equals(p.getId()) && i.getRoom() == null);
-            
-            if (isFullRented && p.getPrice() != null) {
-                income += p.getPrice();
-            }
-
-            dto.setTotalIncome(income);
-            return dto;
-        }).collect(Collectors.toList());
+        List<PropertyDTO> dtos = properties.stream()
+            .map(p -> entityToDTO(p, tenant))
+            .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
     }
@@ -103,11 +109,7 @@ public class PropertyController {
         p.setPrice(dto.getPrice());
         p.setTenant(tenant);
         Property saved = propertyRepository.save(p);
-        dto.setId(saved.getId());
-        dto.setRoomCount(0);
-        dto.setOccupiedRooms(0);
-        dto.setTotalIncome(0.0);
-        return ResponseEntity.status(201).body(dto);
+        return ResponseEntity.status(201).body(entityToDTO(saved, tenant));
     }
     
     @PutMapping("/{id}")
@@ -125,11 +127,9 @@ public class PropertyController {
         p.setName(dto.getName());
         p.setAddress(dto.getAddress());
         p.setPrice(dto.getPrice());
-        propertyRepository.save(p);
+        Property saved = propertyRepository.save(p);
         
-        // Mantener stats pasados
-        dto.setId(p.getId());
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(entityToDTO(saved, tenant));
     }
     
     @DeleteMapping("/{id}")

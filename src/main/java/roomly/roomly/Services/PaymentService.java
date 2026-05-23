@@ -153,6 +153,7 @@ public class PaymentService {
 
     // Mapper
     private PaymentDTO entityToDTO(Payment p) {
+        p.calculateDelayPenalty(DAILY_PENALTY_RATE);
         PaymentDTO dto = new PaymentDTO();
         dto.setId(p.getId());
         if (p.getInquilino() != null) {
